@@ -5,7 +5,7 @@ from langchain.text_splitter import TokenTextSplitter
 
 class OpenAIActionLayer:
     def __init__(self):
-        with open("actions/openai_conf.json", "r") as f:
+        with open("openai_conf.json", "r") as f:
             conf = json.load(f)
             self.api_key = conf["key"]
             self.model = conf["model"]

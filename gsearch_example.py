@@ -1,5 +1,5 @@
-from actions.get_search_query import get_query
-from actions.get_openai_query import (
+from actions.google_search.get_search_query import get_query
+from actions.google_search.get_openai_query import (
     llm_clean_information,
     llm_parse,
     # llm_evaluate_info,
