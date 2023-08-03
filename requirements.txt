@@ -1,5 +1,4 @@
 beautifulsoup4==4.12.2
-googlesearch-python==1.2.3
 google==3.0.0
 google-api-core==2.11.1
 google-api-python-client==2.92.0
@@ -11,3 +10,6 @@ openai==0.27.8
 selenium==4.10.0
 langchain==0.0.246
 tiktoken==0.4.0
+googlesearch-python==1.2.3
+
+# [^\s]([ ]{2,})[\s] --> ==

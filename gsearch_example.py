@@ -31,7 +31,7 @@ def split_into_questions(query):
 
 # get the questions
 split_into_questions(query)
-questions = list(set(questions))
+questions = list(reversed(list(set(questions))))
 
 print(questions)
 # get the information
@@ -49,6 +49,7 @@ for question in questions:
     # if response:
 info_single = llm_clean_information(information, " ".join(questions))
 info_single = [str(info["relevant_information"]) for info in info_single]
+print(info_single)
 information = " ".join(info_single)
 with open("information.txt", "w") as f:
     f.write(information)

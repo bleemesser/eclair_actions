@@ -8,7 +8,7 @@ def get_query(query):
     links_to_scrape = []
     for link in search(query + " site:wikipedia.org", num_results=1):
         links_to_scrape.append(link)
-    for link in search(query, num_results=2):
+    for link in search(query, num_results=1):
         links_to_scrape.append(link)
     # for link in search(query + " site:edu", num_results=2):
     #     links_to_scrape.append(link)
