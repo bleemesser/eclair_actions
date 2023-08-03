@@ -4,10 +4,12 @@ from actions.google_search.get_openai_query import (
     llm_parse,
     # llm_evaluate_info,
     llm_answer,
+    llm_create_keywords,
+    apply_regexes,
     # chunk_text,
 )
 
-query = "Are both the directors of Jaws and Casino Royale from the same country?"
+query = input("Enter a query: ")
 print(query)
 
 questions = []
@@ -39,20 +41,14 @@ information = ""
 for question in questions:
     print(question)
     info_single = get_query(question)
-    info_single = llm_clean_information(info_single, question)
-    info_single = [str(info["relevant_information"]) for info in info_single]
-    # print(info_single[:10])
+    keywords = llm_create_keywords(question)["keywords"]
+    info_single = apply_regexes(info_single, keywords, n=25)
     information += " ".join(info_single)
-    # response = llm_evaluate_info(information, " ".join(questions))
-    # print(response)
-    # # print(information)
-    # if response:
-info_single = llm_clean_information(information, " ".join(questions))
-info_single = [str(info["relevant_information"]) for info in info_single]
-print(info_single)
-information = " ".join(info_single)
 with open("information.txt", "w") as f:
     f.write(information)
+info_single = llm_clean_information(information, " ".join(questions))
+info_single = [str(info["relevant_information"]) for info in info_single]
+information = " ".join(info_single)
 answer = llm_answer(information, query)
 print(answer)
 

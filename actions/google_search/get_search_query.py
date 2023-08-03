@@ -6,9 +6,9 @@ from selenium import webdriver
 def get_query(query):
     # get first 2 .edu and .org results from google
     links_to_scrape = []
-    for link in search(query + " site:wikipedia.org", num_results=1):
+    for link in search(query + " site:wikipedia.org", num_results=1, sleep_interval=5):
         links_to_scrape.append(link)
-    for link in search(query, num_results=1):
+    for link in search(query, num_results=1, sleep_interval=5):
         links_to_scrape.append(link)
     # for link in search(query + " site:edu", num_results=2):
     #     links_to_scrape.append(link)
@@ -26,6 +26,7 @@ def get_query(query):
     page_text = []
     for link in links_to_scrape:
         try:
+            print(f"Fetching content from {link}")
             driver.get(link)
             soup = bs4.BeautifulSoup(driver.page_source, "html.parser")
             blocklist = [
@@ -40,7 +41,7 @@ def get_query(query):
             ]
             page_text.append(" ".join(text_content))
         except:
-            pass
+            print(f"Failed to fetch content from {link}")
     driver.close()
     with open("page_text.txt", "w") as f: # DEBUG
         f.write(" ".join(page_text))

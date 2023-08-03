@@ -1,7 +1,9 @@
 import openai
 import json
 from langchain.text_splitter import TokenTextSplitter
-
+from llama_cpp import Llama
+# import os
+import re
 
 class OpenAIActionLayer:
     def __init__(self):
@@ -11,6 +13,7 @@ class OpenAIActionLayer:
             self.model = conf["model"]
             self.role = conf["role"]
         self.ask = self._create_service()
+        self.max_length = 4096
 
     def _create_service(self):
         openai.api_key = self.api_key
@@ -18,12 +21,30 @@ class OpenAIActionLayer:
         def service(prompt: str):
             messages = [{"role": self.role, "content": prompt}]
             response = openai.ChatCompletion.create(
-                model=self.model, messages=messages, temperature=0,
+                model=self.model,
+                messages=messages,
+                temperature=0,
             )
             return response.choices[0].message["content"]
 
         return service
 
+
+class LLAMAActionLayer:
+    def __init__(self):
+        self.max_length = 512
+        self.ask = self._create_service()
+        self.model = Llama(model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q2_K.bin", n_ctx=1024)
+
+    def _create_service(self):
+        def service(prompt: str):
+            res = self.model(prompt, max_tokens=512, stop=["Q:", "\n"])["choices"][0]["text"]
+            print(f"Model response:\n{res}")
+            return res
+
+        return service
+
+MODEL_LAYER = OpenAIActionLayer()
 
 def chunk_text(text, max_length=4096):
     text_splitter = TokenTextSplitter(chunk_size=max_length, chunk_overlap=0)
@@ -51,17 +72,18 @@ def llm_clean_information(input_text, query):
     """.replace(
         "{1}", query
     )
-    with open("input_text.txt", "w") as f:  # DEBUG
-        f.write(input_text)
+    # with open("input_text.txt", "w") as f:  # DEBUG
+    #     f.write(input_text)
 
-    texts = chunk_text(input_text, max_length=4096 - len(base_prompt))
+    layer = MODEL_LAYER
+
+    texts = chunk_text(input_text, max_length=layer.max_length - len(base_prompt) - 1)
 
     print(f"Cleaning {len(texts)} chunks")
 
     with open("info_pieces.txt", "w") as f:  # DEBUG
         f.write("\n\n\n.................".join(texts))
 
-    layer = OpenAIActionLayer()
     responses = []
     for info_piece in texts:
         prompt = base_prompt.replace("{2}", info_piece)
@@ -69,12 +91,49 @@ def llm_clean_information(input_text, query):
         response = layer.ask(prompt)
         try:
             responses.append(json.loads(response))
-        except json.JSONDecodeError:
+        except Exception as e:
+            if isinstance(e,KeyboardInterrupt):
+                raise e
             responses.append({"relevant_information": []})
             print("JSONDecodeError")
     # print(responses)
     return responses
 
+def llm_create_keywords(query):
+    prompt = """
+    In the following query, the user is asking for information about a topic.
+    Your job is to identify the key words in the query that are relevant to the topic.
+    For example, if the query is "Where was Joe Biden born?", the key words are "birthplace", "born", and "Joe Biden".
+    
+    Respond in this format:
+    {
+        "keywords": ["keyword1", "keyword2", ...]
+    }
+    Always adhere to JSON syntax.
+
+    Here is the query:
+    {1}
+    """.replace("{1}", query)
+    
+    layer = MODEL_LAYER
+    
+    response = layer.ask(prompt)
+    
+    try:
+        response = json.loads(response)
+    except Exception as e:
+        if isinstance(e,KeyboardInterrupt):
+            raise e
+        response = {"keywords": []}
+        print("JSONDecodeError")
+    return response
+
+def apply_regexes(input_text, keywords, n=100):
+    matches = []
+    for keyword in keywords:
+        r = r".{0,{n}}{keyword}.{0,{n}}".replace("{keyword}", keyword).replace("{n}", str(n))
+        matches += re.findall(r, input_text)
+    return matches
 
 def llm_parse(query, previous_questions):
     prompt = """
@@ -104,15 +163,17 @@ def llm_parse(query, previous_questions):
     ).replace(
         "{2}", " - ".join(previous_questions)
     )
-    
+
     # print(prompt)
     # .replace("{2}", input_text if len(prompt + input_text) < 4096 else input_text[:4096-len(prompt)])
 
-    layer = OpenAIActionLayer()
+    layer = MODEL_LAYER
     response = layer.ask(prompt)
     try:
         response = json.loads(response)
-    except json.JSONDecodeError:
+    except Exception as e:
+        if isinstance(e,KeyboardInterrupt):
+            raise e
         response = {
             "needs_followup": False,
             "questions": [],
@@ -140,17 +201,19 @@ def llm_evaluate_info(input_text, query):
     """.replace(
         "{1}", query
     )
+    layer = MODEL_LAYER
 
-    texts = chunk_text(input_text, max_length=4096 - len(base_prompt))
+    texts = chunk_text(input_text, max_length=layer.max_length - len(base_prompt))
     print(f"Evaluating {len(texts)} chunks")
-    layer = OpenAIActionLayer()
     responses = []
     for info_piece in texts:
         prompt = base_prompt.replace("{2}", info_piece)
         response = layer.ask(prompt)
         try:
             responses.append(json.loads(response))
-        except json.JSONDecodeError:
+        except Exception as e:
+            if isinstance(e,KeyboardInterrupt):
+                raise e
             responses.append({"is_sufficient": False})
             print("JSONDecodeError")
     return any(res["is_sufficient"] for res in responses)
@@ -177,19 +240,21 @@ def llm_answer(input_text, query):
     """.replace(
         "{1}", query
     )
+    layer = MODEL_LAYER
 
     prompt = prompt.replace(
         "{2}",
         input_text
-        if len(prompt + input_text) < 4096
-        else input_text[: 4096 - len(prompt)],
+        if len(prompt + input_text) < layer.max_length
+        else input_text[: layer.max_length - len(prompt)],
     )
 
-    layer = OpenAIActionLayer()
     response = layer.ask(prompt)
     try:
         response = json.loads(response)
-    except json.JSONDecodeError:
+    except Exception as e:
+        if isinstance(e,KeyboardInterrupt):
+            raise e
         response = {"answer": False}
         print("JSONDecodeError")
     return response
