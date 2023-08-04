@@ -1,9 +1,8 @@
 import openai
 import json
 from langchain.text_splitter import TokenTextSplitter
-from llama_cpp import Llama
-# import os
 import re
+
 
 class OpenAIActionLayer:
     def __init__(self):
@@ -34,17 +33,23 @@ class LLAMAActionLayer:
     def __init__(self):
         self.max_length = 512
         self.ask = self._create_service()
-        self.model = Llama(model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q2_K.bin", n_ctx=1024)
+        self.model = Llama(
+            model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q4_1.bin",
+            n_ctx=1024,
+        )
 
     def _create_service(self):
-        def service(prompt: str):
-            res = self.model(prompt, max_tokens=512, stop=["Q:", "\n"])["choices"][0]["text"]
-            print(f"Model response:\n{res}")
+        def service(prompt: str, stop: str):
+            res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
+                0
+            ]["text"]
             return res
 
         return service
 
+
 MODEL_LAYER = OpenAIActionLayer()
+
 
 def chunk_text(text, max_length=4096):
     text_splitter = TokenTextSplitter(chunk_size=max_length, chunk_overlap=0)
@@ -92,12 +97,13 @@ def llm_clean_information(input_text, query):
         try:
             responses.append(json.loads(response))
         except Exception as e:
-            if isinstance(e,KeyboardInterrupt):
+            if isinstance(e, KeyboardInterrupt):
                 raise e
             responses.append({"relevant_information": []})
             print("JSONDecodeError")
     # print(responses)
     return responses
+
 
 def llm_create_keywords(query):
     prompt = """
@@ -113,27 +119,33 @@ def llm_create_keywords(query):
 
     Here is the query:
     {1}
-    """.replace("{1}", query)
-    
+    """.replace(
+        "{1}", query
+    )
+
     layer = MODEL_LAYER
-    
+
     response = layer.ask(prompt)
-    
+
     try:
         response = json.loads(response)
     except Exception as e:
-        if isinstance(e,KeyboardInterrupt):
+        if isinstance(e, KeyboardInterrupt):
             raise e
         response = {"keywords": []}
         print("JSONDecodeError")
     return response
 
+
 def apply_regexes(input_text, keywords, n=100):
     matches = []
     for keyword in keywords:
-        r = r".{0,{n}}{keyword}.{0,{n}}".replace("{keyword}", keyword).replace("{n}", str(n))
+        r = r".{0,{n}}{keyword}.{0,{n}}".replace("{keyword}", keyword).replace(
+            "{n}", str(n)
+        )
         matches += re.findall(r, input_text)
     return matches
+
 
 def llm_parse(query, previous_questions):
     prompt = """
@@ -172,7 +184,7 @@ def llm_parse(query, previous_questions):
     try:
         response = json.loads(response)
     except Exception as e:
-        if isinstance(e,KeyboardInterrupt):
+        if isinstance(e, KeyboardInterrupt):
             raise e
         response = {
             "needs_followup": False,
@@ -212,7 +224,7 @@ def llm_evaluate_info(input_text, query):
         try:
             responses.append(json.loads(response))
         except Exception as e:
-            if isinstance(e,KeyboardInterrupt):
+            if isinstance(e, KeyboardInterrupt):
                 raise e
             responses.append({"is_sufficient": False})
             print("JSONDecodeError")
@@ -253,7 +265,7 @@ def llm_answer(input_text, query):
     try:
         response = json.loads(response)
     except Exception as e:
-        if isinstance(e,KeyboardInterrupt):
+        if isinstance(e, KeyboardInterrupt):
             raise e
         response = {"answer": False}
         print("JSONDecodeError")

@@ -3,12 +3,12 @@ from .get_openai_query import (
     llm_create_keywords,
     apply_regexes,
 )
-import openai
-import json
 
-import re
 from .get_search_query import get_query
 
+import openai
+import json
+from llama_cpp import Llama
 
 class DavinciActionLayer:
     def __init__(self):
@@ -34,15 +34,37 @@ class DavinciActionLayer:
             )
             with open(self.logfile, "a") as f:
                 f.write(
-                    f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{response['choices'][0]['text']}</response>\n</task>\n"
+                    f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{response['choices'][0]['text']}\n</response>\n</task>\n"
                 )
 
             return response["choices"][0]["text"]
 
         return service
+    
+class LLAMAActionLayer:
+    def __init__(self):
+        self.max_length = 512
+        self.ask = self._create_service()
+        self.model = Llama(
+            model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q2_K.bin",
+            n_ctx=1024,
+        )
+
+    def _create_service(self):
+        def service(prompt: str, stop: str):
+            res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
+                0
+            ]["text"]
+            with open("llama_log.txt", "a") as f:
+                f.write(
+                    f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{res}\n</response>\n</task>\n"
+                )
+            return res
+
+        return service
 
 
-LAYER = DavinciActionLayer()
+LAYER = LLAMAActionLayer()
 
 
 # def make_info_concise(text):
@@ -146,8 +168,9 @@ Are follow up questions needed here:""",
     while "Follow up:" in last_line(response):
         prompt += response
         question = get_question(response)
-        print(question)
-        answer = gather_info(question)
+        if question is not None:
+            print(question)
+            answer = gather_info(question)
 
         if answer is not None:
             prompt += "\nIntermediate answer: " + answer

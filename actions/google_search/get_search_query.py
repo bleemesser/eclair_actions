@@ -8,11 +8,14 @@ def get_query(query):
     links_to_scrape = []
     for link in search(query + " site:wikipedia.org", num_results=1, sleep_interval=5):
         links_to_scrape.append(link)
+    links_to_scrape = [links_to_scrape[0]]
+    # print(links_to_scrape)
     for link in search(query, num_results=1, sleep_interval=5):
         links_to_scrape.append(link)
+    links_to_scrape = [links_to_scrape[0], links_to_scrape[1]]
     # for link in search(query + " site:edu", num_results=2):
     #     links_to_scrape.append(link)
-
+    # print(links_to_scrape)
     # instantiate chrome driver
     options = webdriver.ChromeOptions()
     options.add_argument('--headless') # somewhat broken
