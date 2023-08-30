@@ -29,23 +29,23 @@ class OpenAIActionLayer:
         return service
 
 
-class LLAMAActionLayer:
-    def __init__(self):
-        self.max_length = 512
-        self.ask = self._create_service()
-        self.model = Llama(
-            model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q4_1.bin",
-            n_ctx=1024,
-        )
+# class LLAMAActionLayer:
+#     def __init__(self):
+#         self.max_length = 512
+#         self.ask = self._create_service()
+#         self.model = Llama(
+#             model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q4_1.bin",
+#             n_ctx=1024,
+#         )
 
-    def _create_service(self):
-        def service(prompt: str, stop: str):
-            res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
-                0
-            ]["text"]
-            return res
+#     def _create_service(self):
+#         def service(prompt: str, stop: str):
+#             res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
+#                 0
+#             ]["text"]
+#             return res
 
-        return service
+#         return service
 
 
 MODEL_LAYER = OpenAIActionLayer()
@@ -84,23 +84,27 @@ def llm_clean_information(input_text, query):
 
     texts = chunk_text(input_text, max_length=layer.max_length - len(base_prompt) - 1)
 
-    print(f"Cleaning {len(texts)} chunks")
+    # print(f"Cleaning {len(texts)} chunks")
 
-    with open("info_pieces.txt", "w") as f:  # DEBUG
-        f.write("\n\n\n.................".join(texts))
+    # with open("info_pieces.txt", "w") as f:  # DEBUG
+    #     f.write("\n\n\n.................".join(texts))
 
     responses = []
-    for info_piece in texts:
-        prompt = base_prompt.replace("{2}", info_piece)
-        # print(prompt)
-        response = layer.ask(prompt)
-        try:
-            responses.append(json.loads(response))
-        except Exception as e:
-            if isinstance(e, KeyboardInterrupt):
-                raise e
-            responses.append({"relevant_information": []})
-            print("JSONDecodeError")
+    with open("gpt-cleaning-log.txt", "a") as f:
+        for info_piece in texts:
+            prompt = base_prompt.replace("{2}", info_piece)
+            # print(prompt)
+            response = layer.ask(prompt)
+            try:
+                responses.append(json.loads(response))
+                f.write(
+                    f"<task>\n<prompt>\n{prompt.strip()}\n</prompt>\n<response>\n{response.strip()}\n</response>\n</task>\n"
+                )
+            except Exception as e:
+                if isinstance(e, KeyboardInterrupt):
+                    raise e
+                responses.append({"relevant_information": []})
+                # print("JSONDecodeError")
     # print(responses)
     return responses
 
@@ -110,6 +114,7 @@ def llm_create_keywords(query):
     In the following query, the user is asking for information about a topic.
     Your job is to identify the key words in the query that are relevant to the topic.
     For example, if the query is "Where was Joe Biden born?", the key words are "birthplace", "born", and "Joe Biden".
+    Another example, if the query is "Who is Justin Bieber's brother?", the key words are "Justin Bieber", "brother", "siblings", and "son".
     
     Respond in this format:
     {
@@ -129,11 +134,16 @@ def llm_create_keywords(query):
 
     try:
         response = json.loads(response)
+        with open("gpt-keyword-log.txt", "a") as f:
+            f.write(
+                f"<task>\n<prompt>\n{prompt.strip()}\n</prompt>\n<response>\n{response}\n</response>\n</task>\n"
+            )
     except Exception as e:
         if isinstance(e, KeyboardInterrupt):
             raise e
         response = {"keywords": []}
-        print("JSONDecodeError")
+        # print("JSONDecodeError")
+        # print(e)
     return response
 
 

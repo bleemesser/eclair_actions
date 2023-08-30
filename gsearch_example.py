@@ -1,4 +1,4 @@
-from actions.google_search.get_search_query import get_query
+from actions.google_search.get_search_query import get_google_query
 from actions.google_search.get_openai_query import (
     llm_clean_information,
     llm_parse,
@@ -40,7 +40,7 @@ print(questions)
 information = ""
 for question in questions:
     print(question)
-    info_single = get_query(question)
+    info_single = get_google_query(question)
     keywords = llm_create_keywords(question)["keywords"]
     info_single = apply_regexes(info_single, keywords, n=25)
     information += " ".join(info_single)
@@ -51,9 +51,3 @@ info_single = [str(info["relevant_information"]) for info in info_single]
 information = " ".join(info_single)
 answer = llm_answer(information, query)
 print(answer)
-
-
-
-
-        
-        

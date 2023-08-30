@@ -4,11 +4,13 @@ from .get_openai_query import (
     apply_regexes,
 )
 
-from .get_search_query import get_query
+from .get_search_query import get_google_query, get_bing_query
 
 import openai
 import json
-from llama_cpp import Llama
+
+# from llama_cpp import Llama
+
 
 class DavinciActionLayer:
     def __init__(self):
@@ -19,7 +21,7 @@ class DavinciActionLayer:
             self.role = conf["role"]
         self.ask = self._create_service()
         self.max_length = 4096
-        self.logfile = "log.txt"
+        self.logfile = "gpt-reasoning-log.txt"
 
     def _create_service(self):
         openai.api_key = self.api_key
@@ -34,38 +36,41 @@ class DavinciActionLayer:
             )
             with open(self.logfile, "a") as f:
                 f.write(
-                    f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{response['choices'][0]['text']}\n</response>\n</task>\n"
+                    f"<task>\n<prompt>\n{prompt.strip()}\n</prompt>\n<response>\n{response['choices'][0]['text']}\n</response>\n</task>\n"
                 )
 
             return response["choices"][0]["text"]
 
         return service
-    
-class LLAMAActionLayer:
-    def __init__(self):
-        self.max_length = 512
-        self.ask = self._create_service()
-        self.model = Llama(
-            model_path=f"/home/blee/code/eclair_actions/model/llama-2-7b-chat.ggmlv3.q2_K.bin",
-            n_ctx=1024,
-        )
-
-    def _create_service(self):
-        def service(prompt: str, stop: str):
-            res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
-                0
-            ]["text"]
-            with open("llama_log.txt", "a") as f:
-                f.write(
-                    f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{res}\n</response>\n</task>\n"
-                )
-            return res
-
-        return service
 
 
-LAYER = LLAMAActionLayer()
+# class LLAMAActionLayer:
+#     def __init__(self):
+#         self.max_length = 512
+#         self.ask = self._create_service()
+#         self.model = Llama(
+#             model_path=f"/home/blee/code/eclair_actions/model/llama-2-13b-chat.ggmlv3.q8_0.bin",
+#             n_ctx=1024,
+#             n_gpu_layers=1000,
+#         )
 
+#     def _create_service(self):
+#         def service(prompt: str, stop: str):
+#             res = self.model(prompt, max_tokens=512, stop=stop, echo=False)["choices"][
+#                 0
+#             ]["text"]
+#             with open("llama-reasoning-log.txt", "a") as f:
+#                 f.write(
+#                     f"<task>\n<prompt>\n{prompt}\n</prompt>\n<response>\n{res}\n</response>\n</task>\n"
+#                 )
+#             return res
+
+#         return service
+
+
+# LAYER = LLAMAActionLayer()
+LAYER = DavinciActionLayer()
+SEARCH_ENGINE = "bing" # google, bing
 
 # def make_info_concise(text):
 #     prompt = """
@@ -91,10 +96,19 @@ def last_line(text):
 
 
 def gather_info(query):
-    page_text = get_query(query)
+    if SEARCH_ENGINE == "google":
+        page_text = get_google_query(query)
+    elif SEARCH_ENGINE == "bing":
+        page_text = get_bing_query(query)
+    else:
+        raise Exception("Invalid search engine")
+    # print("got page text")
     keywords = llm_create_keywords(query)["keywords"]
+    # print("got keywords")
     information = apply_regexes(page_text, keywords, n=100)
+    # print("got information")
     information = llm_clean_information("---".join(information), query)
+    # print("got cleaned information")
     information = [str(info["relevant_information"]) for info in information]
     information = list(set(information))
     # return make_info_concise(" ".join(information))
@@ -105,7 +119,7 @@ def get_question(text):
     final_line = last_line(text)
 
     if "Follow up:" not in final_line:
-        print("ERROR: no follow up question found")
+        # print("ERROR: no follow up question found")
         return None
     if ":" not in final_line:
         after_colon = final_line
@@ -114,13 +128,13 @@ def get_question(text):
     if " " == after_colon[0]:
         after_colon = after_colon[1:]
     if "?" != after_colon[-1]:
-        print("ERROR: no question mark found")
+        # print("ERROR: no question mark found")
         return None
     return after_colon
 
 
 def self_ask(initial_question, context=[]):
-    print(initial_question)
+    # print(initial_question)
     prompt = [
         """Question: Who lived longer, Muhammad Ali or Alan Turing?
 Are follow up questions needed here: Yes.
@@ -169,16 +183,16 @@ Are follow up questions needed here:""",
         prompt += response
         question = get_question(response)
         if question is not None:
-            print(question)
+            # print(question)
             answer = gather_info(question)
 
         if answer is not None:
             prompt += "\nIntermediate answer: " + answer
-            print(answer)
+            # print(answer)
             response = LAYER.ask(prompt, stop="Intermediate answer:")
         else:
             prompt += "\nIntermediate answer: "
-            print("ERROR: no answer found")
+            # print("ERROR: no answer found")
             gpt_answer = LAYER.ask(
                 prompt, stop=["\n" + "Follow up:", "\nSo the final answer is:"]
             )
@@ -186,6 +200,6 @@ Are follow up questions needed here:""",
 
     if "So the final answer is:" not in response:
         prompt += "\nSo the final answer is: "
-        print("ERROR: no final answer found")
+        # print("ERROR: no final answer found")
         response = LAYER.ask(prompt, stop="\n")
-    return response
+    return response.replace("So the final answer is: ", "").replace("No.\n", "")
