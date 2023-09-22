@@ -160,6 +160,10 @@ Follow up: Who was the father of Mary Ball Washington?
 Intermediate answer: The father of Mary Ball Washington was Joseph Ball.
 So the final answer is: Joseph Ball 
 
+Question: What is there to see near Sedona, Arizona?
+Are follow up questions needed here: No.
+Follow up: What is there to see near Sedona, Arizona?
+
 Question: Are both the directors of Jaws and Casino Royale from the same country? 
 Are follow up questions needed here: Yes. 
 Follow up: Who is the director of Jaws? 

@@ -5,3 +5,6 @@ __pycache__
 *.bin
 *.csv
 !*-log.csv
+checkpoints/
+wandb/
+treei/
